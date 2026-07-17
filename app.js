@@ -350,37 +350,44 @@ function compressImage(file, maxDim, quality){
 }
 
 function photoSlotEl(key, label){
-  const inputId = 'photo_'+key;
+  const inputCamId = 'photocam_'+key;
+  const inputGalId = 'photogal_'+key;
   const preview = el('div',{class:'photo-preview', id:'prev_'+key}, 'Belum ada foto');
-  const slot = el('div',{class:'photo-slot', id:'slot_'+key},
-    el('div',{class:'ps-label'}, label),
-    preview,
-    el('div',{class:'photo-actions'},
-      el('label',{class:'upl', for:inputId}, '📷 Ambil / Upload'),
-      el('input',{type:'file', id:inputId, accept:'image/*', capture:'environment',
-        onchange: async (e)=>{
-          const file = e.target.files[0];
-          if(!file) return;
-          preview.textContent = 'Memproses...';
-          try{
-            const { blob, dataUrl, width, height } = await compressImage(file, 1400, 0.72);
-            state.photos[key] = { blob, dataUrl, width, height, name: key+'.jpg' };
-            preview.innerHTML = '';
-            preview.appendChild(el('img',{src:dataUrl}));
-            slot.classList.add('filled');
-          }catch(err){
-            preview.textContent = 'Gagal memuat foto';
-          }
-        }
-      }),
-      el('button',{type:'button', class:'clear-btn', onclick:()=>{
-        delete state.photos[key];
-        preview.innerHTML = ''; preview.textContent = 'Belum ada foto';
-        slot.classList.remove('filled');
-        document.getElementById(inputId).value = '';
-      }}, '✕')
-    )
-  );
+  const slot = el('div',{class:'photo-slot', id:'slot_'+key});
+
+  async function handleFile(file){
+    if(!file) return;
+    preview.textContent = 'Memproses...';
+    try{
+      const { blob, dataUrl, width, height } = await compressImage(file, 1400, 0.72);
+      state.photos[key] = { blob, dataUrl, width, height, name: key+'.jpg' };
+      preview.innerHTML = '';
+      preview.appendChild(el('img',{src:dataUrl}));
+      slot.classList.add('filled');
+    }catch(err){
+      preview.textContent = 'Gagal memuat foto';
+    }
+  }
+
+  slot.appendChild(el('div',{class:'ps-label'}, label));
+  slot.appendChild(preview);
+  slot.appendChild(el('div',{class:'photo-actions'},
+    el('label',{class:'upl', for:inputCamId}, '📷 Kamera'),
+    el('input',{type:'file', id:inputCamId, accept:'image/*', capture:'environment',
+      onchange: e=> handleFile(e.target.files[0])}),
+    el('label',{class:'upl', for:inputGalId, style:'background:var(--accent-2);'}, '🖼️ Galeri / File'),
+    el('input',{type:'file', id:inputGalId, accept:'image/*',
+      onchange: e=> handleFile(e.target.files[0])}),
+    el('button',{type:'button', class:'clear-btn', onclick:()=>{
+      delete state.photos[key];
+      preview.innerHTML = ''; preview.textContent = 'Belum ada foto';
+      slot.classList.remove('filled');
+      document.getElementById(inputCamId).value = '';
+      document.getElementById(inputGalId).value = '';
+    }}, '✕')
+  ));
+  slot.appendChild(el('p',{class:'hint', style:'margin-top:6px;'},
+    'Pakai app kamera timestamp? Motret dulu di app itu, lalu tekan "Galeri / File" untuk memilihnya di sini.'));
   return slot;
 }
 
@@ -794,6 +801,13 @@ async function buildDocx(){
   const photoParas = await photoParagraphs();
 
   const doc = new Document({
+    styles: {
+      default: {
+        document: {
+          run: { font: 'Calibri', size: 22 },
+        },
+      },
+    },
     sections: [{
       properties:{},
       children: [
