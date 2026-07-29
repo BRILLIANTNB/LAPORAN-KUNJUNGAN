@@ -756,14 +756,24 @@ async function ensureFolder(name, parentId){
 }
 
 async function driveUploadFile(blob, filename, parentId, mimeType){
-  const metadata = { name: filename, parents: [parentId] };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
-  form.append('file', blob, filename);
+  const metadata = { name: filename, parents: [parentId], mimeType };
+  const boundary = 'lkt_boundary_' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const metadataPart =
+    `--${boundary}\r\n` +
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+    `${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Type: ${mimeType}\r\n\r\n`;
+  const closeDelim = `\r\n--${boundary}--`;
+  const requestBody = new Blob([metadataPart, blob, closeDelim]);
+
   const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
     method:'POST',
-    headers: { Authorization:'Bearer '+accessToken },
-    body: form
+    headers: {
+      Authorization: 'Bearer '+accessToken,
+      'Content-Type': `multipart/related; boundary=${boundary}`
+    },
+    body: requestBody
   });
   const data = await res.json();
   if(!res.ok) throw new Error('Gagal upload file: '+(data.error && data.error.message));
