@@ -9,6 +9,8 @@ const LOGO2_B64 = "iVBORw0KGgoAAAANSUhEUgAAAV4AAABrCAIAAACwiX3nAACJ+UlEQVR4nOz9d
 
 /* ---------------------- CONFIG (persisted locally) --------------------- */
 const CFG_KEYS = { clientId: 'lkt_client_id', folderId: 'lkt_folder_id' };
+const DEFAULT_CLIENT_ID = '700290194310-cmdf2qqb26hlhu4j0vi45e7khdvh8k1i.apps.googleusercontent.com';
+const DEFAULT_FOLDER_ID = '1LfDpdzDnpj2FuQ0bz3Q9xCMRBFPbDYVa';
 function getCfg(key, fallback){ try{ return localStorage.getItem(key) || fallback; }catch(e){ return fallback; } }
 function setCfg(key, val){ try{ localStorage.setItem(key, val); }catch(e){} }
 
@@ -134,10 +136,8 @@ const PHOTO_ITEMS = [
   ['stabilizer_sesudah','Foto Stabilizer (Sesudah)'],
   ['lain_sebelum','Foto Lain-Lain (Sebelum)'],
   ['lain_sesudah','Foto Lain-Lain (Sesudah)'],
-  ['speedtest_lokasi_sebelum','Capture Speedtest SSID Nama Lokasi (Sebelum)'],
-  ['speedtest_lokasi_sesudah','Capture Speedtest SSID Nama Lokasi (Sesudah)'],
-  ['speedtest_baktiaksi_sebelum','Capture Speedtest SSID BAKTI AKSI (Sebelum)'],
-  ['speedtest_baktiaksi_sesudah','Capture Speedtest SSID BAKTI AKSI (Sesudah)'],
+  ['speedtest_lokasi','Capture Speedtest SSID Nama Lokasi'],
+  ['speedtest_baktiaksi','Capture Speedtest SSID BAKTI AKSI'],
   ['wifi_analyzer_ap1','Foto Wifi Analyzer AP#1'],
   ['wifi_analyzer_ap2','Foto Wifi Analyzer AP#2'],
   ['wifi_analyzer_ap1_baktiaksi','Foto Wifi Analyzer AP#1 — BAKTI AKSI'],
@@ -662,8 +662,8 @@ function fillGeolocation(){
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  document.getElementById('cfgClientId').value = getCfg(CFG_KEYS.clientId, '');
-  document.getElementById('cfgFolderId').value = getCfg(CFG_KEYS.folderId, '1LfDpdzDnpj2FuQ0bz3Q9xCMRBFPbDYVa');
+  document.getElementById('cfgClientId').value = getCfg(CFG_KEYS.clientId, DEFAULT_CLIENT_ID);
+  document.getElementById('cfgFolderId').value = getCfg(CFG_KEYS.folderId, DEFAULT_FOLDER_ID);
   renderForm();
   initGoogleAuth();
 });
@@ -682,7 +682,7 @@ function log(msg){
 }
 
 function initGoogleAuth(){
-  const clientId = getCfg(CFG_KEYS.clientId, '');
+  const clientId = getCfg(CFG_KEYS.clientId, DEFAULT_CLIENT_ID);
   const holder = document.getElementById('gsiBtnHolder');
   holder.innerHTML = '';
   if(!clientId){
@@ -940,20 +940,64 @@ function deviceTable(){
   return new Table({ width:{size:100,type:WidthType.PERCENTAGE}, rows: trs });
 }
 
+async function imageParagraphOrPlaceholder(key, maxW){
+  const p = state.photos[key];
+  if(p && p.blob){
+    const buf = new Uint8Array(await p.blob.arrayBuffer());
+    const ratio = (p.width && p.height) ? p.height/p.width : 0.75;
+    const w = maxW, h = Math.round(maxW*ratio);
+    return new Paragraph({ children:[ new ImageRun({ data: buf, transformation:{ width:w, height:h }, type:'jpg' }) ] });
+  }
+  return new Paragraph({ children:[ new TextRun({ text:'(Foto belum diisi)', italics:true, color:'999999' }) ] });
+}
+
+async function singlePhotoBlock(key, label){
+  return [
+    new Paragraph({ spacing:{before:200,after:80}, children:[ new TextRun({ text: label, bold:true, size:20 }) ] }),
+    await imageParagraphOrPlaceholder(key, 380),
+  ];
+}
+
+async function pairPhotoBlock(beforeKey, beforeLabel, afterKey, afterLabel){
+  const beforeImg = await imageParagraphOrPlaceholder(beforeKey, 260);
+  const afterImg = await imageParagraphOrPlaceholder(afterKey, 260);
+  const B = { style: BorderStyle.SINGLE, size:4, color:'999999' };
+  const CB = { top:B, bottom:B, left:B, right:B };
+  const table = new Table({
+    width:{size:100,type:WidthType.PERCENTAGE},
+    rows: [
+      new TableRow({ children:[
+        new TableCell({ width:{size:5000,type:WidthType.DXA}, borders:CB, shading:{type:ShadingType.CLEAR, fill:'F0F3F8'},
+          children:[ new Paragraph({ alignment:AlignmentType.CENTER, children:[ new TextRun({text: beforeLabel, bold:true, size:18}) ] }) ] }),
+        new TableCell({ width:{size:5000,type:WidthType.DXA}, borders:CB, shading:{type:ShadingType.CLEAR, fill:'F0F3F8'},
+          children:[ new Paragraph({ alignment:AlignmentType.CENTER, children:[ new TextRun({text: afterLabel, bold:true, size:18}) ] }) ] }),
+      ]}),
+      new TableRow({ children:[
+        new TableCell({ width:{size:5000,type:WidthType.DXA}, borders:CB, children:[ beforeImg ] }),
+        new TableCell({ width:{size:5000,type:WidthType.DXA}, borders:CB, children:[ afterImg ] }),
+      ]}),
+    ]
+  });
+  return [ new Paragraph({ spacing:{before:200,after:0}, text:'' }), table ];
+}
+
 async function photoParagraphs(){
   const out = [];
+  const labelMap = new Map(PHOTO_ITEMS);
+  const rendered = new Set();
   for(const [key,label] of PHOTO_ITEMS){
-    out.push(new Paragraph({ spacing:{before:200,after:80}, children:[ new TextRun({ text: label, bold:true, size:20 }) ] }));
-    const p = state.photos[key];
-    if(p && p.blob){
-      const buf = new Uint8Array(await p.blob.arrayBuffer());
-      const maxW = 380;
-      const ratio = (p.width && p.height) ? p.height/p.width : 0.75;
-      const w = maxW, h = Math.round(maxW*ratio);
-      out.push(new Paragraph({ children:[ new ImageRun({ data: buf, transformation:{ width:w, height:h }, type:'jpg' }) ] }));
-    } else {
-      out.push(new Paragraph({ children:[ new TextRun({ text:'(Foto belum diisi)', italics:true, color:'999999' }) ] }));
+    if(rendered.has(key)) continue;
+    if(key.endsWith('_sebelum')){
+      const prefix = key.slice(0, -('_sebelum'.length));
+      const afterKey = prefix + '_sesudah';
+      if(labelMap.has(afterKey)){
+        out.push(...await pairPhotoBlock(key, label, afterKey, labelMap.get(afterKey)));
+        rendered.add(key); rendered.add(afterKey);
+        continue;
+      }
     }
+    out.push(...await singlePhotoBlock(key, label));
+    rendered.add(key);
   }
   return out;
 }
@@ -1067,6 +1111,26 @@ function validateRequired(){
   if(!f.nama_lokasi || !f.nama_lokasi.trim()) return 'Nama Lokasi wajib diisi.';
   if(!f.site_id || !f.site_id.trim()) return 'Site ID wajib diisi.';
   if(!f.tanggal) return 'Tanggal Kunjungan wajib diisi.';
+
+  const missingDevices = [];
+  DEVICE_ITEMS.forEach(it=>{
+    const before = state.fields['dev_sn_before_'+it.key];
+    const after = state.fields['dev_sn_after_'+it.key];
+    if(!before || !before.trim() || !after || !after.trim()) missingDevices.push(it.label);
+  });
+  if(missingDevices.length){
+    return 'Bagian "Perangkat Terpasang" wajib diisi lengkap (S/N Sebelum & Sesudah).\nBelum diisi: ' + missingDevices.join(', ');
+  }
+
+  const missingPhotos = [];
+  PHOTO_ITEMS.forEach(([key,label])=>{
+    if(!state.photos[key] || !state.photos[key].blob) missingPhotos.push(label);
+  });
+  if(missingPhotos.length){
+    return 'Bagian "Dokumentasi Foto" wajib diisi semua ('+missingPhotos.length+' foto belum diisi).\nBelum diisi: '
+      + missingPhotos.slice(0,6).join(', ') + (missingPhotos.length>6 ? ', dan lainnya.' : '.');
+  }
+
   return null;
 }
 
@@ -1126,9 +1190,9 @@ async function submitReport(){
   const err = validateRequired();
   if(err){ alert(err); return; }
   const btn = document.getElementById('submitBtn');
-  const parentId = getCfg(CFG_KEYS.folderId, '');
+  const parentId = getCfg(CFG_KEYS.folderId, DEFAULT_FOLDER_ID);
   if(!parentId){ alert('ID Folder Google Drive belum diatur. Buka Pengaturan.'); return; }
-  if(!getCfg(CFG_KEYS.clientId,'')){ alert('Google Client ID belum diatur. Buka Pengaturan.'); return; }
+  if(!getCfg(CFG_KEYS.clientId, DEFAULT_CLIENT_ID)){ alert('Google Client ID belum diatur. Buka Pengaturan.'); return; }
 
   btn.disabled = true;
   const origText = btn.textContent;
