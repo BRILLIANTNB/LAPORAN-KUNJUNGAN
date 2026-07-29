@@ -138,11 +138,12 @@ const PHOTO_ITEMS = [
   ['lain_sesudah','Foto Lain-Lain (Sesudah)'],
   ['speedtest_lokasi','Capture Speedtest SSID Nama Lokasi'],
   ['speedtest_baktiaksi','Capture Speedtest SSID BAKTI AKSI'],
-  ['wifi_analyzer_ap1','Foto Wifi Analyzer AP#1'],
-  ['wifi_analyzer_ap2','Foto Wifi Analyzer AP#2'],
-  ['wifi_analyzer_ap1_baktiaksi','Foto Wifi Analyzer AP#1 — BAKTI AKSI'],
-  ['wifi_analyzer_ap2_baktiaksi','Foto Wifi Analyzer AP#2 — BAKTI AKSI'],
-  ['berita_acara','Lampiran Foto Berita Acara'],
+  ['wifi_analyzer_ap1','Foto Wifi Analyzer AP#1 (Opsional)'],
+  ['wifi_analyzer_ap2','Foto Wifi Analyzer AP#2 (Opsional)'],
+  ['wifi_analyzer_ap1_baktiaksi','Foto Wifi Analyzer AP#1 — BAKTI AKSI (Opsional)'],
+  ['wifi_analyzer_ap2_baktiaksi','Foto Wifi Analyzer AP#2 — BAKTI AKSI (Opsional)'],
+  ['berita_acara_1','Lampiran Foto Berita Acara (1)'],
+  ['berita_acara_2','Lampiran Foto Berita Acara (2)'],
 ];
 
 /* --------------------------- RENDER HELPERS ------------------------------ */
@@ -1116,6 +1117,10 @@ function namaBulanDariTanggal(tglStr){
   return BULAN_ID[d.getMonth()];
 }
 
+const OPTIONAL_PHOTO_KEYS = new Set([
+  'wifi_analyzer_ap1', 'wifi_analyzer_ap2', 'wifi_analyzer_ap1_baktiaksi', 'wifi_analyzer_ap2_baktiaksi'
+]);
+
 function validateRequired(){
   const f = state.fields;
   if(!f.nama_lokasi || !f.nama_lokasi.trim()) return 'Nama Lokasi wajib diisi.';
@@ -1134,6 +1139,7 @@ function validateRequired(){
 
   const missingPhotos = [];
   PHOTO_ITEMS.forEach(([key,label])=>{
+    if(OPTIONAL_PHOTO_KEYS.has(key)) return;
     if(!state.photos[key] || !state.photos[key].blob) missingPhotos.push(label);
   });
   if(missingPhotos.length){
