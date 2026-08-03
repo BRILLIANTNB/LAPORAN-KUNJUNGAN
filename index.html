@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Laporan Kunjungan Teknisi</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/docx@8.5.0/build/index.iife.js"></script>
 <style>
   :root{
@@ -100,21 +99,17 @@
 <body>
 
 <div id="authBar">
-  <div id="gsiBtnHolder"></div>
-  <span class="status-text" id="authStatusText">Belum login Google.</span>
+  <span class="status-text">📡 Laporan Kunjungan Teknisi — tanpa login, langsung isi &amp; kirim.</span>
   <button class="config-toggle" type="button" onclick="toggleConfig()">Pengaturan</button>
 </div>
 
 <div class="wrap" id="configWrap" style="margin-top:12px;">
   <div class="card" style="padding:12px 14px;">
-    <button class="config-toggle" type="button" onclick="toggleConfig()">⚙ Pengaturan Aplikasi (Client ID / Folder Drive)</button>
+    <button class="config-toggle" type="button" onclick="toggleConfig()">⚙ Pengaturan Aplikasi (URL Server)</button>
     <div id="configPanel">
-      <label>Google OAuth Client ID</label>
-      <input type="text" id="cfgClientId" placeholder="xxxxxxxx.apps.googleusercontent.com">
-      <p class="hint">Diminta sekali per perangkat. Lihat PANDUAN-SETUP.md untuk cara membuatnya di Google Cloud Console.</p>
-      <label>ID Folder Google Drive Tujuan (folder induk semua laporan)</label>
-      <input type="text" id="cfgFolderId" value="1LfDpdzDnpj2FuQ0bz3Q9xCMRBFPbDYVa">
-      <p class="hint">Diambil otomatis dari link folder yang diberikan. Ganti jika perlu.</p>
+      <label>URL Apps Script Backend</label>
+      <input type="text" id="cfgAppsScriptUrl" placeholder="https://script.google.com/macros/s/xxx/exec">
+      <p class="hint">Sudah otomatis terisi. Cuma perlu diubah kalau backend di-deploy ulang. Lihat PANDUAN-SETUP.md.</p>
       <button class="btn btn-outline btn-sm" type="button" onclick="saveConfig()">Simpan Pengaturan</button>
       <span id="cfgSavedMsg" class="hint" style="color:var(--accent-2);"></span>
     </div>
