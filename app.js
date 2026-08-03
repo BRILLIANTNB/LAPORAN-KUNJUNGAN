@@ -179,7 +179,9 @@ function simpleField(id, labelText, type, opts){
       inputEl.appendChild(optEl);
     });
   } else {
-    inputEl = el('input',{id:'f_'+id, type: type||'text', value: state.fields[id], oninput:e=>state.fields[id]=e.target.value});
+    inputEl = el('input',{id:'f_'+id, type: type||'text', value: state.fields[id],
+      oninput:e=>state.fields[id]=e.target.value,
+      onchange:e=>state.fields[id]=e.target.value});
     if(opts.placeholder) inputEl.setAttribute('placeholder', opts.placeholder);
   }
   return el('div',{},
