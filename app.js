@@ -8,9 +8,7 @@ const LOGO2_B64 = "iVBORw0KGgoAAAANSUhEUgAAAV4AAABrCAIAAACwiX3nAACJ+UlEQVR4nOz9d
 ========================================================================= */
 
 /* ---------------------- CONFIG (persisted locally) --------------------- */
-const CFG_KEYS = { clientId: 'lkt_client_id', folderId: 'lkt_folder_id' };
-const DEFAULT_CLIENT_ID = '700290194310-cmdf2qqb26hlhu4j0vi45e7khdvh8k1i.apps.googleusercontent.com';
-const DEFAULT_FOLDER_ID = '1LfDpdzDnpj2FuQ0bz3Q9xCMRBFPbDYVa';
+const CFG_KEYS = { appsScriptUrl: 'lkt_apps_script_url' };
 function getCfg(key, fallback){ try{ return localStorage.getItem(key) || fallback; }catch(e){ return fallback; } }
 function setCfg(key, val){ try{ localStorage.setItem(key, val); }catch(e){} }
 
@@ -18,13 +16,10 @@ function toggleConfig(){
   document.getElementById('configPanel').classList.toggle('show');
 }
 function saveConfig(){
-  const cid = document.getElementById('cfgClientId').value.trim();
-  const fid = document.getElementById('cfgFolderId').value.trim();
-  setCfg(CFG_KEYS.clientId, cid);
-  setCfg(CFG_KEYS.folderId, fid);
+  const url = document.getElementById('cfgAppsScriptUrl').value.trim();
+  setCfg(CFG_KEYS.appsScriptUrl, url);
   document.getElementById('cfgSavedMsg').textContent = 'Tersimpan ✓';
   setTimeout(()=>{ document.getElementById('cfgSavedMsg').textContent=''; }, 2000);
-  initGoogleAuth();
 }
 
 /* ------------------------------ STATE ----------------------------------- */
@@ -672,17 +667,16 @@ function fillGeolocation(){
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
-  document.getElementById('cfgClientId').value = getCfg(CFG_KEYS.clientId, DEFAULT_CLIENT_ID);
-  document.getElementById('cfgFolderId').value = getCfg(CFG_KEYS.folderId, DEFAULT_FOLDER_ID);
+  document.getElementById('cfgAppsScriptUrl').value = getCfg(CFG_KEYS.appsScriptUrl, DEFAULT_APPS_SCRIPT_URL);
   renderForm();
-  initGoogleAuth();
 });
 
-/* --------------------------- GOOGLE AUTH / DRIVE --------------------------- */
+/* --------------------------- APPS SCRIPT BACKEND ---------------------------- */
+/* Tidak ada login Google sama sekali di sisi teknisi. Semua upload & update
+   spreadsheet dijalankan oleh Apps Script atas nama akun pemilik data
+   (misal timypbcool). Ganti APPS_SCRIPT_URL di bawah setelah deploy backend. */
 
-let tokenClient = null;
-let accessToken = null;
-let tokenExpiry = 0;
+const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbza43jtSCtincB9Gon8wB9M6jPjCOWk7eBBbD6o3A67UT7KFZ0Tnh9MFPd9vEjMF_gDMQ/exec';
 
 function log(msg){
   const box = document.getElementById('statusLog');
@@ -691,104 +685,30 @@ function log(msg){
   box.scrollTop = box.scrollHeight;
 }
 
-function initGoogleAuth(){
-  const clientId = getCfg(CFG_KEYS.clientId, DEFAULT_CLIENT_ID);
-  const holder = document.getElementById('gsiBtnHolder');
-  holder.innerHTML = '';
-  if(!clientId){
-    holder.appendChild(el('span',{class:'hint'}, 'Isi Client ID di Pengaturan dulu ⚙'));
-    return;
-  }
-  if(!window.google || !google.accounts || !google.accounts.oauth2){
-    holder.appendChild(el('span',{class:'hint'}, 'Memuat Google...'));
-    setTimeout(initGoogleAuth, 500);
-    return;
-  }
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: clientId,
-    scope: 'https://www.googleapis.com/auth/drive',
-    callback: (resp)=>{
-      if(resp.error){ log('Login gagal: '+resp.error); return; }
-      accessToken = resp.access_token;
-      tokenExpiry = Date.now() + (resp.expires_in*1000 - 60000);
-      document.getElementById('authStatusText').textContent = 'Login Google berhasil ✓';
-    }
-  });
-  const btn = el('button',{type:'button', class:'btn btn-outline btn-sm', onclick: signIn}, 'Login dengan Google');
-  holder.appendChild(btn);
-}
-
-function signIn(){
-  if(!tokenClient){ initGoogleAuth(); return; }
-  tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
-}
-
-function ensureSignedIn(){
+function blobToBase64(blob){
   return new Promise((resolve, reject)=>{
-    if(accessToken && Date.now() < tokenExpiry){ resolve(accessToken); return; }
-    if(!tokenClient){ reject(new Error('Client ID belum diatur. Buka Pengaturan.')); return; }
-    tokenClient.callback = (resp)=>{
-      if(resp.error){ reject(new Error('Login gagal: '+resp.error)); return; }
-      accessToken = resp.access_token;
-      tokenExpiry = Date.now() + (resp.expires_in*1000 - 60000);
-      document.getElementById('authStatusText').textContent = 'Login Google berhasil ✓';
-      resolve(accessToken);
-    };
-    tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+    const fr = new FileReader();
+    fr.onload = ()=> resolve(fr.result.split(',')[1]);
+    fr.onerror = reject;
+    fr.readAsDataURL(blob);
   });
 }
 
-async function driveFindFolder(name, parentId){
-  const q = encodeURIComponent(`name='${name.replace(/'/g,"\\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
-    headers: { Authorization: 'Bearer '+accessToken }
-  });
-  const data = await res.json();
-  if(data.files && data.files.length) return data.files[0].id;
-  return null;
-}
-
-async function driveCreateFolder(name, parentId){
-  const res = await fetch('https://www.googleapis.com/drive/v3/files', {
+async function sendToAppsScript(payload){
+  const url = getCfg(CFG_KEYS.appsScriptUrl, DEFAULT_APPS_SCRIPT_URL);
+  if(!url || url.indexOf('GANTI_DENGAN') === 0){
+    throw new Error('URL Apps Script belum diatur. Buka Pengaturan.');
+  }
+  const res = await fetch(url, {
     method:'POST',
-    headers: { Authorization:'Bearer '+accessToken, 'Content-Type':'application/json' },
-    body: JSON.stringify({ name, mimeType:'application/vnd.google-apps.folder', parents:[parentId] })
+    headers: { 'Content-Type':'text/plain;charset=utf-8' }, // hindari CORS preflight
+    body: JSON.stringify(payload)
   });
   const data = await res.json();
-  if(!res.ok) throw new Error('Gagal buat folder: '+(data.error && data.error.message));
-  return data.id;
-}
-
-async function ensureFolder(name, parentId){
-  let id = await driveFindFolder(name, parentId);
-  if(!id) id = await driveCreateFolder(name, parentId);
-  return id;
-}
-
-async function driveUploadFile(blob, filename, parentId, mimeType){
-  const metadata = { name: filename, parents: [parentId], mimeType };
-  const boundary = 'lkt_boundary_' + Date.now().toString(36) + Math.random().toString(36).slice(2);
-  const metadataPart =
-    `--${boundary}\r\n` +
-    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-    `${JSON.stringify(metadata)}\r\n` +
-    `--${boundary}\r\n` +
-    `Content-Type: ${mimeType}\r\n\r\n`;
-  const closeDelim = `\r\n--${boundary}--`;
-  const requestBody = new Blob([metadataPart, blob, closeDelim]);
-
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
-    method:'POST',
-    headers: {
-      Authorization: 'Bearer '+accessToken,
-      'Content-Type': `multipart/related; boundary=${boundary}`
-    },
-    body: requestBody
-  });
-  const data = await res.json();
-  if(!res.ok) throw new Error('Gagal upload file: '+(data.error && data.error.message));
+  if(!data.ok) throw new Error(data.error || 'Gagal diproses server.');
   return data;
 }
+
 
 /* -------------------------------- DOCX BUILD -------------------------------- */
 
@@ -1215,9 +1135,10 @@ async function submitReport(){
   const err = validateRequired();
   if(err){ alert(err); return; }
   const btn = document.getElementById('submitBtn');
-  const parentId = getCfg(CFG_KEYS.folderId, DEFAULT_FOLDER_ID);
-  if(!parentId){ alert('ID Folder Google Drive belum diatur. Buka Pengaturan.'); return; }
-  if(!getCfg(CFG_KEYS.clientId, DEFAULT_CLIENT_ID)){ alert('Google Client ID belum diatur. Buka Pengaturan.'); return; }
+  const scriptUrl = getCfg(CFG_KEYS.appsScriptUrl, DEFAULT_APPS_SCRIPT_URL);
+  if(!scriptUrl || scriptUrl.indexOf('GANTI_DENGAN') === 0){
+    alert('URL Apps Script belum diatur. Buka Pengaturan.'); return;
+  }
 
   btn.disabled = true;
   const origText = btn.textContent;
@@ -1225,50 +1146,65 @@ async function submitReport(){
   document.getElementById('statusLog').classList.add('show');
 
   try{
-    btn.textContent = 'Login Google...';
-    setProgress(10);
-    log('Menghubungkan ke akun Google...');
-    await ensureSignedIn();
-
     btn.textContent = 'Menyusun laporan...';
-    setProgress(30);
+    setProgress(20);
     log('Menyusun dokumen Word...');
     const doc = await buildDocx();
     const blob = await Packer.toBlob(doc);
 
-    btn.textContent = 'Menyiapkan folder Drive...';
-    setProgress(55);
-
-    let currentParent = parentId;
+    btn.textContent = 'Menyiapkan data...';
+    setProgress(45);
+    const fileBase64 = await blobToBase64(blob);
     const bulanTahun = bulanTahunFolderName();
-    if(bulanTahun){
-      log('Menyiapkan folder bulan: '+bulanTahun);
-      currentParent = await ensureFolder(bulanTahun, currentParent);
-    }
     const kategori = kategoriFolderName();
-    if(kategori){
-      log('Menyiapkan folder kategori: '+kategori);
-      currentParent = await ensureFolder(kategori, currentParent);
-    } else {
-      log('Kategori belum dipilih, folder diletakkan langsung di bawah folder bulan.');
-    }
-    const fName = folderName();
-    log('Menyiapkan folder lokasi: '+fName);
-    const targetFolderId = await ensureFolder(fName, currentParent);
-
-    btn.textContent = 'Mengupload...';
-    setProgress(75);
+    const folderLokasi = folderName();
     const finalName = fileBaseName()+'.docx';
-    log('Mengupload file: '+finalName);
-    const result = await driveUploadFile(blob, finalName, targetFolderId, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+    log('Mengirim ke server (upload Drive + update spreadsheet)...');
+    btn.textContent = 'Mengirim...';
+    setProgress(65);
+
+    const result = await sendToAppsScript({
+      fileName: finalName,
+      fileBase64: fileBase64,
+      bulanTahun: bulanTahun,
+      kategori: kategori,
+      folderLokasi: folderLokasi,
+      siteId: state.fields.site_id,
+      tanggal: state.fields.tanggal,
+    });
 
     setProgress(100);
-    log('Berhasil diupload ✓');
-    if(result.webViewLink) log('Link: '+result.webViewLink);
-    alert('Laporan berhasil diupload ke Google Drive!\nFolder: '+[bulanTahun, kategori, fName].filter(Boolean).join(' / '));
+
+    if(result.drive){
+      log('Upload ke Drive berhasil ✓');
+      if(result.drive.url) log('Link: '+result.drive.url);
+    } else {
+      log('⚠ Upload ke Drive GAGAL: '+(result.driveError||'tidak diketahui'));
+    }
+
+    if(result.sheet && result.sheet.updated){
+      log('Update spreadsheet berhasil ✓ (kolom: '+result.sheet.label+')');
+    } else if(result.sheet){
+      log('⚠ Spreadsheet TIDAK diupdate: '+(result.sheet.reason||'tidak diketahui'));
+    } else if(result.sheetError){
+      log('⚠ Update spreadsheet GAGAL: '+result.sheetError);
+    }
+
+    const driveOk = !!result.drive;
+    const sheetOk = !!(result.sheet && result.sheet.updated);
+    if(driveOk && sheetOk){
+      alert('Laporan berhasil diupload ke Drive dan spreadsheet sudah terupdate!\nFolder: '+[bulanTahun, kategori, folderLokasi].filter(Boolean).join(' / '));
+    } else if(driveOk && !sheetOk){
+      alert('File berhasil diupload ke Drive, TAPI update spreadsheet gagal.\nCek kotak log di bawah, mohon update manual kolom tanggal PM untuk site ini.');
+    } else if(!driveOk && sheetOk){
+      alert('Spreadsheet berhasil diupdate, TAPI upload file ke Drive gagal.\nCoba tombol "Simpan ke HP/Laptop" lalu upload manual filenya.');
+    } else {
+      alert('Gagal total (Drive maupun spreadsheet). Cek kotak log di bawah.\nCoba tombol "Simpan ke HP/Laptop" sebagai cadangan.');
+    }
   }catch(e){
     log('ERROR: '+e.message);
-    alert('Gagal upload: '+e.message+'\n\nCoba tombol "Simpan ke HP/Laptop" sebagai cadangan.');
+    alert('Gagal mengirim: '+e.message+'\n\nCoba tombol "Simpan ke HP/Laptop" sebagai cadangan.');
   }finally{
     btn.disabled = false;
     btn.textContent = origText;
