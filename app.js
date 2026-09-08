@@ -170,7 +170,7 @@ function simpleField(id, labelText, type, opts){
   state.fields[id] = state.fields[id] || opts.default || '';
   let inputEl;
   if(type === 'textarea'){
-    inputEl = el('textarea',{id:'f_'+id, oninput:e=>state.fields[id]=e.target.value}, state.fields[id]);
+    inputEl = el('textarea',{id:'f_'+id, oninput:e=>state.fields[id]=e.target.value, onchange:e=>state.fields[id]=e.target.value}, state.fields[id]);
   } else if(type === 'select'){
     inputEl = el('select',{id:'f_'+id, onchange:e=>state.fields[id]=e.target.value});
     (opts.options||[]).forEach(o=>{
@@ -222,14 +222,14 @@ function compareItemEl(itemKey, label, opts){
     toggleGroup('before'),
     opts.meterLabel ? el('div',{class:'extra-field'},
       el('input',{type:'text', placeholder:opts.meterLabel, value:c.extra.meter_before,
-        oninput:e=>c.extra.meter_before=e.target.value})) : null
+        oninput:e=>c.extra.meter_before=e.target.value, onchange:e=>c.extra.meter_before=e.target.value})) : null
   );
   const afterCol = el('div',{class:'ci-col'},
     el('span',{class:'ci-tag'},'Sesudah'),
     toggleGroup('after'),
     opts.meterLabel ? el('div',{class:'extra-field'},
       el('input',{type:'text', placeholder:opts.meterLabel, value:c.extra.meter_after,
-        oninput:e=>c.extra.meter_after=e.target.value})) : null
+        oninput:e=>c.extra.meter_after=e.target.value, onchange:e=>c.extra.meter_after=e.target.value})) : null
   );
 
   return el('div',{class:'compare-item'},
@@ -248,7 +248,7 @@ function customRowsBlock(groupName, addLabel, placeholder){
         // ensure compare state exists under a stable key
       }
       const nameInput = el('input',{type:'text', placeholder:placeholder, value:row.name,
-        oninput:e=>row.name=e.target.value, style:'margin-bottom:8px;'});
+        oninput:e=>row.name=e.target.value, onchange:e=>row.name=e.target.value, style:'margin-bottom:8px;'});
       const compareBlock = compareItemEl('custom_'+groupName+'_'+row.id, '', {});
       // remove default label line since name is editable above
       compareBlock.querySelector('.ci-label').remove();
@@ -283,17 +283,17 @@ function parameterItemEl(item){
         Object.keys(labels).map(f=>
           el('div',{class:'extra-field'},
             el('input',{type:'text', placeholder:labels[f], value:c[side][f],
-              oninput:e=>c[side][f]=e.target.value}))
+              oninput:e=>c[side][f]=e.target.value, onchange:e=>c[side][f]=e.target.value}))
         )
       );
     } else if(item.kind === 'text'){
       c[side+'_val'] = c[side+'_val'] || '';
       return el('input',{type:'text', value:c[side+'_val'], placeholder:item.label,
-        oninput:e=>c[side+'_val']=e.target.value});
+        oninput:e=>c[side+'_val']=e.target.value, onchange:e=>c[side+'_val']=e.target.value});
     } else {
       c[side+'_val'] = c[side+'_val'] || '';
       return el('input',{type:'text', value:c[side+'_val'], placeholder:'Nilai',
-        oninput:e=>c[side+'_val']=e.target.value});
+        oninput:e=>c[side+'_val']=e.target.value, onchange:e=>c[side+'_val']=e.target.value});
     }
   }
 
@@ -316,7 +316,7 @@ function altNetworkItemEl(item){
   );
   Array.from(sel.options).forEach(o=>{ if(o.value===c.status) o.selected = true; });
   const opInput = el('input',{type:'text', placeholder:'Nama operator / keterangan', value:c.operator,
-    oninput:e=>c.operator=e.target.value});
+    oninput:e=>c.operator=e.target.value, onchange:e=>c.operator=e.target.value});
   return el('div',{class:'compare-item'},
     el('div',{class:'ci-label'}, item.label),
     el('div',{class:'row2'}, sel, opInput)
@@ -615,10 +615,12 @@ function renderForm(){
       el('div',{class:'ci-grid'},
         el('div',{class:'ci-col'}, el('span',{class:'ci-tag'},'Sebelum'),
           el('input',{type:'text', id:'f_dev_sn_before_'+it.key, value:state.fields['dev_sn_before_'+it.key],
-            oninput:e=>state.fields['dev_sn_before_'+it.key]=e.target.value})),
+            oninput:e=>state.fields['dev_sn_before_'+it.key]=e.target.value,
+            onchange:e=>state.fields['dev_sn_before_'+it.key]=e.target.value})),
         el('div',{class:'ci-col'}, el('span',{class:'ci-tag'},'Sesudah'),
           el('input',{type:'text', id:'f_dev_sn_after_'+it.key, value:state.fields['dev_sn_after_'+it.key],
-            oninput:e=>state.fields['dev_sn_after_'+it.key]=e.target.value}))
+            oninput:e=>state.fields['dev_sn_after_'+it.key]=e.target.value,
+            onchange:e=>state.fields['dev_sn_after_'+it.key]=e.target.value}))
       )
     ));
   });
@@ -630,12 +632,12 @@ function renderForm(){
       devCustomWrap.appendChild(el('div',{class:'compare-item', style:'position:relative;'},
         el('button',{type:'button', class:'remove-x', onclick:()=>{ state.customRows.device.splice(idx,1); redrawDevCustom(); }}, '✕'),
         el('input',{type:'text', placeholder:'Nama perangkat lainnya', value:row.name, style:'margin-bottom:8px;',
-          oninput:e=>row.name=e.target.value}),
+          oninput:e=>row.name=e.target.value, onchange:e=>row.name=e.target.value}),
         el('div',{class:'ci-grid'},
           el('div',{class:'ci-col'}, el('span',{class:'ci-tag'},'Sebelum'),
-            el('input',{type:'text', value:row.snBefore, oninput:e=>row.snBefore=e.target.value})),
+            el('input',{type:'text', value:row.snBefore, oninput:e=>row.snBefore=e.target.value, onchange:e=>row.snBefore=e.target.value})),
           el('div',{class:'ci-col'}, el('span',{class:'ci-tag'},'Sesudah'),
-            el('input',{type:'text', value:row.snAfter, oninput:e=>row.snAfter=e.target.value}))
+            el('input',{type:'text', value:row.snAfter, oninput:e=>row.snAfter=e.target.value, onchange:e=>row.snAfter=e.target.value}))
         )
       ));
     });
@@ -1156,7 +1158,9 @@ async function submitReport(){
 
     btn.textContent = 'Menyiapkan data...';
     setProgress(45);
+    log('Ukuran file Word (lokal): '+(blob.size/1024).toFixed(0)+' KB');
     const fileBase64 = await blobToBase64(blob);
+    log('Ukuran base64 yang akan dikirim: '+(fileBase64.length/1024).toFixed(0)+' KB');
     const bulanTahun = bulanTahunFolderName();
     const kategori = kategoriFolderName();
     const folderLokasi = folderName();
@@ -1180,6 +1184,11 @@ async function submitReport(){
 
     if(result.drive){
       log('Upload ke Drive berhasil ✓');
+      log('Ukuran base64 diterima server: '+(result.drive.base64LengthReceived/1024).toFixed(0)+' KB (dikirim: '+(fileBase64.length/1024).toFixed(0)+' KB)');
+      log('Ukuran file tersimpan di Drive: '+(result.drive.byteLength/1024).toFixed(0)+' KB');
+      if(result.drive.base64LengthReceived !== fileBase64.length){
+        log('⚠ PERINGATAN: ukuran data yang diterima server BEDA dari yang dikirim! Kemungkinan data terpotong di tengah jalan.');
+      }
       if(result.drive.url) log('Link: '+result.drive.url);
     } else {
       log('⚠ Upload ke Drive GAGAL: '+(result.driveError||'tidak diketahui'));
